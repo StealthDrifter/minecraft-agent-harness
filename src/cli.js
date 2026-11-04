@@ -241,12 +241,16 @@ async function runWorker(config) {
     );
     await startAgent(config, {
         attempt: Number(process.env.MINECRAFT_AGENT_ATTEMPT ?? 0),
-        onSession: info =>
-            say(
-                info.resumed
-                    ? `resumed session ${path.basename(info.file ?? '')} (${info.messages} messages${info.interrupted ? ', picking up an interrupted turn' : ''})`
-                    : `new session ${path.basename(info.file ?? '')}`,
-            ),
+        onSession: info => {
+            const session = info.resumed
+                ? `resumed session ${path.basename(info.file ?? '')} (${info.messages} messages${info.interrupted ? ', picking up an interrupted turn' : ''})`
+                : `new session ${path.basename(info.file ?? '')}`;
+            const limits =
+                info.contextWindow || info.maxTokens
+                    ? `; harness limits: context ${info.contextWindow ?? 'model default'}, output ${info.maxTokens ?? 'model default'}`
+                    : '';
+            say(`${session}${limits}`);
+        },
         onReady: ({ tools, position }) =>
             say(
                 `spawned${position ? ` at ${position}` : ''}; ${tools.length} tools ready. Logs: ${path.join(config.stateDir, config.name, 'telemetry.jsonl')}`,
