@@ -92,6 +92,14 @@ export function resolveConfig(
         errors.push('name must be 1-16 letters, digits or underscores (a valid Minecraft username)');
     if (!String(raw.objective ?? '').trim())
         errors.push('objective is required, for example --objective "Build a cozy oak cabin near spawn"');
+    const contextWindow = raw.contextWindow == null ? undefined : Number(raw.contextWindow);
+    const maxTokens = raw.maxTokens == null ? undefined : Number(raw.maxTokens);
+    if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || contextWindow < 1))
+        errors.push('contextWindow must be a positive integer');
+    if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens < 1))
+        errors.push('maxTokens must be a positive integer');
+    if (contextWindow !== undefined && maxTokens !== undefined && maxTokens >= contextWindow)
+        errors.push('maxTokens must be smaller than contextWindow');
     if (!['survival', 'creative'].includes(raw.gameMode))
         errors.push(`gameMode must be survival or creative, got ${raw.gameMode}`);
     if (!THINKING.includes(raw.thinking)) errors.push(`thinking must be one of ${THINKING.join(', ')}`);
@@ -130,6 +138,8 @@ export function resolveConfig(
         model: {
             ...model,
             ...(raw.baseUrl ? { baseUrl: raw.baseUrl, name: raw.modelName ?? model.id } : {}),
+            ...(raw.baseUrl && contextWindow !== undefined ? { contextWindow } : {}),
+            ...(raw.baseUrl && maxTokens !== undefined ? { maxTokens } : {}),
             ...(raw.serviceTier ? { serviceTier: raw.serviceTier } : {}),
             ...(raw.requestTimeoutMs ? { requestTimeoutMs: Number(raw.requestTimeoutMs) } : {}),
             ...(raw.baseUrl && raw.apiKeyHeader && env.MODEL_API_KEY
