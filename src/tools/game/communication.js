@@ -2,7 +2,7 @@ import { assertSurvival, requireFunction } from './runtime.js';
 import { integer, peer, text } from './schema.js';
 
 export function createCommunication(ctx) {
-    const { add, bot, mailbox, peers, plan, whisperPlayers } = ctx;
+    const { add, bot, mailbox, peers, plan, whisperPlayers, publicStatusUpdates } = ctx;
     if (mailbox) {
         add('message_status', 'Your unread DM counts and public-chat counts; does not mark read.', {}, () =>
             mailbox.summary(),
@@ -70,6 +70,30 @@ export function createCommunication(ctx) {
             return { posted: true };
         },
     );
+    if (publicStatusUpdates) {
+        let lastStatusAt = -Infinity;
+        add(
+            'post_status',
+            'Post one concise public progress update about what you just accomplished and your next step. Limited to one update every 30 seconds; use post_chat for a direct reply to the human.',
+            { text: text(256) },
+            a => {
+                const waitMs = 30000 - (Date.now() - lastStatusAt);
+                if (waitMs > 0) return { posted: false, reason: 'status cooldown', retryAfterMs: waitMs };
+                if (
+                    !a.text.trim() ||
+                    /[\\r\\n]/.test(a.text) ||
+                    a.text.includes('\\0') ||
+                    a.text.trimStart().startsWith('/') ||
+                    /![A-Za-z]+/.test(a.text)
+                )
+                    throw new Error('Use plain speech, without commands or newlines.');
+                assertSurvival(bot);
+                bot.chat(a.text);
+                lastStatusAt = Date.now();
+                return { posted: true };
+            },
+        );
+    }
     if (plan) {
         add(
             'read_plan',
