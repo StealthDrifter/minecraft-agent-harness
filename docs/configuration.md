@@ -78,7 +78,7 @@ Keys come from the provider's usual environment variable:
 
 ### OpenAI Responses compatible endpoints
 
-For a LiteLLM proxy, vLLM, or an internal gateway that speaks the OpenAI Responses API:
+For a LiteLLM proxy, vLLM, LM Studio, or an internal gateway that speaks the OpenAI Responses API:
 
 ```sh
 MODEL_API_KEY=... npx minecraft-agent --base-url https://gateway.example.com/v1 --model gateway/my-model -o "..."
@@ -86,7 +86,12 @@ MODEL_API_KEY=... npx minecraft-agent --base-url https://gateway.example.com/v1 
 
 The part before the slash names the provider; the rest is sent as the model id. The key in `MODEL_API_KEY` is sent as a
 bearer token. In a config file you can also set `apiKeyHeader` (for gateways that expect a header such as `api-key`),
-`serviceTier`, and `requestTimeoutMs`.
+`serviceTier`, and `requestTimeoutMs`. For local endpoints, set `contextWindow` to the context size actually loaded in
+ the server and `maxTokens` to the desired output limit. The harness uses `contextWindow` to trigger Pi's automatic
+ conversation compaction; if it is larger than the server's real limit, requests can fail before compaction runs. The
+ quick-swarm example uses 60,000 context tokens and a 2,048-token output limit; adjust those to match the model loaded
+ in LM Studio. The first team prompt is already about 10,000 tokens, so an 8,192-token context cannot fit it even with
+ a fresh session.
 
 ### Custom providers
 
