@@ -28,7 +28,7 @@ What changes in team mode:
 - Agents message each other with `send_dm` and `read_dms`. Unread counts show up in every observation.
 - With `sharedMachine: "none"` and `sandbox: "none"`, team agents have no shell, shared machine, or general workspace file tools.
 - Team mode provides only `read_shared_notes` and `append_shared_note` for shared written coordination. Notes are timestamped, limited to 2,000 characters each, and stored in `<state-dir>/shared/shared-notes.jsonl`.
-- Agents cannot read or post public chat. A human can issue a command in Minecraft chat with `@all <command>` or `@AgentName <command>`; only the addressed agent(s) receive it.
+- Agents cannot read general public chat. A human can issue a command in Minecraft chat with `@all <command>` or `@AgentName <command>`; only the addressed agent(s) receive it. Address prefixes are stripped from the command text, while the routed event retains its recipient. `post_chat` sends direct human-facing replies; setting `publicStatusUpdates: true` also enables `post_status`, limited to one progress update per agent every 30 seconds.
 - Each agent's `<state-dir>/<agent>/telemetry.jsonl` contains timestamped observations, emitted model messages (including reasoning text when the provider exposes it), tool arguments and results, messages, and game events. Hidden model computation is not available to the harness.
 
 `sharedMachine` can be:
