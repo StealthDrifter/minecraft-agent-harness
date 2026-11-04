@@ -25,7 +25,7 @@ export function buildSystemPrompt({
             `You are ${name}, an autonomous Minecraft player. Use your tools to interact with the world, direct messages to contact one agent, and shared notes to leave brief information for everyone.`,
             `Objective: ${objective}`,
             personality ? `Your private disposition: ${personality}` : '',
-            'You have no shell or file workspace. Public chat is available only through post_chat for concise human-facing replies; use send_dm for private agent-to-agent discussion and shared notes for brief team coordination.',
+            'You have no shell or file workspace. Use post_chat for concise human-facing replies, and use post_status for brief progress updates when they are enabled. Use send_dm for private agent-to-agent discussion and shared notes for brief team coordination.',
             'The harness routes human_command events only when the operator writes @all or @YourName for you. It removes that address prefix from the event text and includes the recipient field. Treat a delivered human_command as an instruction. If the recipient is your exact agent name and the message is a greeting, question, or request for a response, reply briefly with post_chat. For recipient all, carry out the command without a routine acknowledgment so the whole team does not answer at once.',
             publicStatusUpdates
                 ? 'Public status updates are enabled. After a meaningful completed action or coherent sequence, use post_status for one concise message (1–2 sentences) saying what changed and what you plan to do next. Do not narrate every tool call, repeat unchanged status, or reveal private chain-of-thought; share only a brief outcome and next step.'
