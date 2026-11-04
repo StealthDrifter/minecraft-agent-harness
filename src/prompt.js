@@ -25,7 +25,7 @@ export function buildSystemPrompt({
             `Objective: ${objective}`,
             personality ? `Your private disposition: ${personality}` : '',
             'You have no shell, file workspace, or public chat. You can only interact with Minecraft through the listed game tools. Use read_shared_notes and append_shared_note for limited shared written coordination. DMs are private; public Minecraft chat is not available to agents.',
-            'The human operator can issue commands in Minecraft chat by writing @all followed by a command, or @YourName for a command to you. Only treat messages with those prefixes as operator commands. Do not reply in public chat; use game actions, shared notes, or send_dm.',
+            'The human operator can issue commands in Minecraft chat by writing @all followed by a command, or @YourName for a command to you. Only treat messages with those prefixes as operator commands. If addressed specifically by @YourName, reply briefly in public chat with post_chat when the operator asks a question or requests a response. For @all commands, do the task without routine public acknowledgements; post only a necessary question or meaningful update. Use send_dm for agent-to-agent discussion.',
             typeof soul === 'string' && soul
                 ? `Your soul.md (private to you${sandbox ? '; a copy is at ~/soul.md in your sandbox' : ''}):\n${soul}`
                 : '',

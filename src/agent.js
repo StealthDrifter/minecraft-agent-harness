@@ -506,7 +506,7 @@ export async function startAgent(settings, options = {}) {
             peers,
             perStepFrames: withImages,
             whisperPlayers: !team,
-        }).filter(t => !team || !['post_chat', 'read_chat', 'read_plan', 'append_plan'].includes(t.name));
+        }).filter(t => !team || !['read_chat', 'read_plan', 'append_plan'].includes(t.name));
         let workspaceTools = team
             ? []
             : await createWorkspaceTools({
