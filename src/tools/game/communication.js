@@ -81,8 +81,8 @@ export function createCommunication(ctx) {
                 if (waitMs > 0) return { posted: false, reason: 'status cooldown', retryAfterMs: waitMs };
                 if (
                     !a.text.trim() ||
-                    /[\\r\\n]/.test(a.text) ||
-                    a.text.includes('\\0') ||
+                    /[\r\n]/.test(a.text) ||
+                    a.text.includes('\0') ||
                     a.text.trimStart().startsWith('/') ||
                     /![A-Za-z]+/.test(a.text)
                 )
