@@ -294,7 +294,7 @@ async function runTeam(file, cwd) {
         return 2;
     }
     const team = readConfigFile(path.resolve(cwd, file));
-    const { agents = [], sharedMachine = 'local', staggerSeconds = 3, ...common } = team;
+    const { agents = [], sharedMachine = 'none', staggerSeconds = 3, ...common } = team;
     if (!Array.isArray(agents) || agents.length < 2) {
         console.error('minecraft-agent team: "agents" must list at least two agents');
         return 2;

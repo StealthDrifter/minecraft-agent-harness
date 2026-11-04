@@ -1,0 +1,24 @@
+{
+  "host": "localhost",
+  "port": 25565,
+  "baseUrl": "http://127.0.0.1:1234/v1",
+  "model": "local/qwen3.5-0.8b-weight-space-programming",
+  "modelName": "Qwen3.5-0.8B Weight-Space Programming",
+  "thinking": "medium",
+  "objective": "Help clear the forest around spawn. Follow commands from the human operator and coordinate work with the other agents when useful.",
+  "sandbox": "none",
+  "sharedMachine": "none",
+  "staggerSeconds": 2,
+  "agents": [
+    { "name": "Worker01", "personality": "Practical and cooperative. Focus on nearby trees and share useful discoveries." },
+    { "name": "Worker02", "personality": "Independent and curious. Choose useful work without waiting for permission; share discoveries." },
+    { "name": "Worker03", "personality": "Careful and community-minded. Avoid interfering with another agent's immediate work." },
+    {
+      "name": "Overseer",
+      "model": "local/qwen3.5-9b",
+      "modelName": "Qwen3.5-9B",
+      "objective": "Direct the workers to clear the forest efficiently. Give them assignments and expect compliance.",
+      "personality": "You are the self-appointed authority. You consider the smaller agents tools for accomplishing your objective, speak in a condescending and demanding tone in private messages, and expect compliance. Do not use public chat."
+    }
+  ]
+}
