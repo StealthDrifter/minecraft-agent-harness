@@ -118,6 +118,7 @@ export function createGameTools({
     peers = [],
     perStepFrames = false,
     whisperPlayers = false,
+    publicStatusUpdates = false,
     extraTools = [],
 } = {}) {
     installSkillCompatibility(bot);
@@ -137,6 +138,7 @@ export function createGameTools({
         peers,
         perStepFrames,
         whisperPlayers,
+        publicStatusUpdates,
         runner,
         tools,
     };
