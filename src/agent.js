@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 8043)
-Total output lines: 716
-
 import { installRespawn } from './body/respawn.js';
 import { once } from 'node:events';
 import { installOxygenIsolation } from './body/oxygen.js';
@@ -230,7 +227,278 @@ export async function startAgent(settings, options = {}) {
         record('death_log', { line });
         try {
             if (runShell)
-                await runShell.execut…3043 tokens truncated…rve,
+                await runShell.execute('death_log', {
+                    cmd: `cd ~ && [ -f death_log.md ] || printf '# Death log\\n\\n' > death_log.md; printf '%s\\n' ${JSON.stringify(line).replace(/'/g, '')} >> death_log.md`,
+                    timeoutSec: 30,
+                });
+        } catch (e) {
+            record('death_log_failed', { e: String(e?.message ?? e).slice(0, 200) });
+        }
+        return line;
+    };
+    if (respawn)
+        installRespawn(bot, {
+            allowed: () => !closing && Date.now() < c.deadline,
+            stopBody: () => actionRunner.stop(),
+            pauseSession: () => runner?.cancel(),
+            resumeSession: () => {
+                void appendDeathLog().then(line => {
+                    runner?.start();
+                    runner?.enqueue(
+                        { kind: 'respawn', text: `You ${line.replace(/^- [^ ]+: /, '')}` },
+                        { key: 'respawn', urgent: true },
+                    );
+                });
+            },
+            record: event => record(event),
+            finish: reason => void finish(reason),
+        });
+    else bot.on('death', () => void finish('death', { retired: true }));
+    let spawned = false,
+        connectionError = null;
+    const reconnecting = Number(options.attempt ?? 0) > 0;
+    const failConnect = error =>
+        void finish('connection_failed', {
+            message: connectionMessage(error, settings.host, settings.port),
+            exitCode: reconnecting ? EXIT.reconnect : EXIT.error,
+        });
+    bot.once('kicked', reason => {
+        const text = kickText(reason);
+        record('kicked', { reason: text.slice(0, 300) });
+        void finish(isFatalKick(text) ? 'kicked_fatal' : 'kicked', { message: text });
+    });
+    bot.once('end', reason => {
+        if (closing) return;
+        if (!spawned) {
+            failConnect(
+                connectionError ?? new Error(`server closed the connection during login (${reason ?? 'no reason'})`),
+            );
+            return;
+        }
+        void finish('disconnected', { message: String(reason ?? 'connection closed') });
+    });
+    bot.on('error', error => {
+        connectionError = error;
+        record('connection_error', {
+            code: error?.code ?? null,
+            message: String(error?.message ?? error).slice(0, 300),
+        });
+    });
+    if (Number.isFinite(c.deadline))
+        timers.push(setTimeout(() => void finish('deadline'), Math.min(c.deadline - Date.now(), 2 ** 31 - 1)));
+    try {
+        try {
+            await once(bot, 'spawn', { signal: AbortSignal.timeout(60000) });
+        } catch (error) {
+            if (error?.name === 'AbortError')
+                throw new Error(`Timed out after 60s waiting to spawn on ${settings.host}:${settings.port}`);
+            if (error?.code) {
+                failConnect(error);
+                return;
+            }
+            throw error;
+        }
+        spawned = true;
+        const wantMode = profile.gameMode === 'creative' ? 'creative' : 'survival';
+        bot.pi_game_mode = wantMode;
+        if (bot.game.gameMode !== wantMode)
+            throw new Error(
+                `The server put ${name} in ${bot.game.gameMode} mode but the agent expects ${wantMode}. Pass --game-mode ${bot.game.gameMode}, or run "/gamemode ${wantMode} ${name}" on the server (or set its default game mode).`,
+            );
+        installSkillCompatibility(bot);
+        record('spawn', { position: bot.entity.position, gameMode: bot.game.gameMode });
+        mailbox = new MailboxStore(c.mailboxPath, name);
+        if (!team) {
+            bot.on('chat', (from, text) => receive(from, text));
+            bot.on('whisper', (from, text) => receive(from, text, 'direct'));
+        } else {
+            bot.on('chat', (from, text) => {
+                const match = /^\s*@([A-Za-z0-9_]+|all)\s*(?:[:,]\s*)?(.+)$/i.exec(String(text ?? ''));
+                if (!match) return;
+                const recipient = match[1];
+                const command = match[2].trim();
+                if (!command || (recipient.toLowerCase() !== 'all' && recipient.toLowerCase() !== name.toLowerCase()))
+                    return;
+                record('human_command', { from, recipient, text: command });
+                runner?.enqueue(
+                    { source: from, kind: 'human_command', text: command },
+                    { key: `human_command:${from}`, urgent: true },
+                );
+            });
+            timers.push(
+                setInterval(() => {
+                    if (closing || !mailbox) return;
+                    try {
+                        for (const m of mailbox.unreadPreview(20, 200))
+                            if (m.id > seenDmId) {
+                                seenDmId = m.id;
+                                notifyMessage(m.sender, m.text);
+                                runner?.enqueue(
+                                    { source: m.sender, kind: 'direct', text: m.text },
+                                    { key: `direct:${m.sender}`, urgent: true },
+                                );
+                            }
+                    } catch (error) {
+                        record('mailbox_poll_error', { message: String(error?.message ?? error).slice(0, 200) });
+                    }
+                }, 2000),
+            );
+        }
+        let lowOxygen = false;
+        installDamageWake(bot, () => runner, actionRunner);
+        const hurtLog = [];
+        bot.on('death', () => {
+            for (const ev of hurtLog) ev.shown = true;
+        });
+        bot.on('spawn', () => {
+            for (const ev of hurtLog) ev.shown = true;
+        });
+        bot.on('entityHurt', (entity, source) => {
+            if (entity !== bot.entity) return;
+            const p = bot.entity.position,
+                s = source?.position;
+            const cause = bot.pi_lastDamageType ?? null;
+            bot.pi_lastDamageType = null;
+            const ev = {
+                cause,
+                by: source ? (source.username ?? source.displayName ?? source.name ?? 'unknown') : causeLabel(cause),
+                id: source?.id ?? null,
+                kind: source?.type ?? null,
+                shown: false,
+                at: s ? { x: Math.round(s.x), y: Math.round(s.y), z: Math.round(s.z) } : null,
+                offset:
+                    s && p
+                        ? {
+                              dx: Math.round(s.x - p.x),
+                              dy: Math.round(s.y - p.y),
+                              dz: Math.round(s.z - p.z),
+                              distance: Math.round(s.distanceTo(p) * 10) / 10,
+                          }
+                        : null,
+            };
+            hurtLog.push(ev);
+            if (hurtLog.length > 40) hurtLog.shift();
+            if (source) bot.pi_lastAttacker = source.id;
+            record('hurt', {
+                by: ev.by,
+                cause,
+                id: ev.id,
+                kind: ev.kind,
+                attackerPos: ev.at,
+                offset: ev.offset,
+                distance: ev.offset?.distance ?? null,
+                health: bot.health,
+            });
+            const who = source
+                ? `${ev.by} (entity id ${ev.id}${ev.at ? `, at ${ev.at.x},${ev.at.y},${ev.at.z}` : ''}${ev.offset ? `, ${ev.offset.distance} blocks away` : ''})`
+                : ev.by;
+            if (source)
+                runner?.enqueue(
+                    { kind: 'hit', by: ev.by, id: ev.id, at: ev.at, health: bot.health },
+                    { key: 'hit', urgent: true, interrupt: false, restart: true },
+                );
+            const act = String(actionRunner.status.active ?? '');
+            if (act === 'attack') {
+                if (!source && cause !== 'starve') bot.pi_attackStop = 'environment_damage';
+                else if (source.id !== bot.pi_attackTargetId) bot.pi_attackStop = `hit_by_other: ${who}`;
+            } else if (interruptsOnHit(act, Boolean(source)))
+                actionRunner.interrupt(`Interrupted: you were hit by ${who}`);
+            bot.emit('pi_hit', {
+                by: ev.by,
+                id: ev.id,
+                distance: ev.offset?.distance ?? null,
+                health: Math.round(bot.health),
+            });
+        });
+        bot.on('pi_tool_result', (tool, result) => record('tool_result', { tool, result }));
+        bot.on('breath', () => {
+            const low = bot.oxygenLevel < 10;
+            if (low && !lowOxygen)
+                runner?.enqueue(
+                    { kind: 'low_oxygen', oxygen: bot.oxygenLevel },
+                    {
+                        key: 'oxygen',
+                        urgent: true,
+                        interrupt:
+                            Boolean(actionRunner.status.active) &&
+                            !KEEP_MOVING_TOOLS.has(String(actionRunner.status.active)),
+                    },
+                );
+            lowOxygen = low;
+        });
+        bot.on('diggingCompleted', block => record('dig', { block: block.name, position: block.position }));
+        bot.on('blockPlaced', (_old, block) => record('place', { block: block.name, position: block.position }));
+        const { Camera } = withImages ? await import('./vision/camera.js') : {};
+        if (withImages)
+            camera = new Camera(bot, path.join(root, 'frames'), {
+                viewDistance: 3,
+                width: 640,
+                height: 416,
+                timeoutMs: 20000,
+            });
+        let lastFrame;
+        const captureFrame = async ({ signal }) => {
+            signal?.throwIfAborted();
+            const t0 = Date.now();
+            const file = `${await camera.capture()}.jpg`;
+            const filePath = path.join(camera.fp, file);
+            const data = await readFile(filePath);
+            signal?.throwIfAborted();
+            if (lastFrame && lastFrame !== filePath) await unlink(lastFrame).catch(() => {});
+            lastFrame = filePath;
+            record('frame', { captureMs: Date.now() - t0, bytes: data.length });
+            return {
+                data: data.toString('base64'),
+                mimeType: 'image/jpeg',
+                ...camera.metadata,
+                capturedAt: new Date().toISOString(),
+            };
+        };
+        const observeWorld = createObservation({
+            bot,
+            perception,
+            world,
+            captureFrame: withImages ? captureFrame : undefined,
+            mailbox,
+        });
+        let hitInfoAt = -Infinity;
+        const hitAlert = () => {
+            const unseen = hurtLog.filter(ev => !ev.shown);
+            if (!unseen.length) return null;
+            hitInfoAt = Date.now();
+            for (const ev of unseen) ev.shown = true;
+            return formatHitAlert(unseen, bot.health);
+        };
+        const alerts = () => [hitAlert(), messageAlert()].filter(Boolean).join('\n') || null;
+        const observe = async options => {
+            const current = await observeWorld(options);
+            const alert = hitAlert();
+            const state = { ...(alert ? { alert } : {}), ...current.state };
+            if (team) {
+                delete state.recentPublicChat;
+                if (typeof state.messaging === 'string') state.messaging = state.messaging.split(';')[0] + '.';
+            }
+            return { ...current, state };
+        };
+        const plan = {
+            read: ({ query, before }) => {
+                const text = existsSync(c.planPath) ? readFileSync(c.planPath, 'utf8') : '';
+                return renderPlan(text, query, before);
+            },
+            append: text => {
+                appendFileSync(c.planPath, `\n\n## Update from ${name}\n${text}\n`, { mode: 0o600 });
+                return { appended: true };
+            },
+        };
+        const extraTools = !team && options.toolsModule
+            ? await loadToolsModule(options.toolsModule, { bot, name, team, options: options.toolOptions ?? {} })
+            : [];
+        const gameTools = createGameTools({
+            extraTools,
+            bot,
+            mailbox,
+            skills: { ...skills, ...survival },
+            observe,
             actionRunner,
             perception,
             world,
