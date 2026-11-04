@@ -321,7 +321,7 @@ export async function startAgent(settings, options = {}) {
                     return;
                 record('human_command', { from, recipient, text: command });
                 runner?.enqueue(
-                    { source: from, kind: 'human_command', text: command },
+                    { source: from, kind: 'human_command', text: command, recipient: recipient.toLowerCase() === 'all' ? 'all' : name },
                     { key: `human_command:${from}`, urgent: true },
                 );
             });
@@ -506,6 +506,7 @@ export async function startAgent(settings, options = {}) {
             peers,
             perStepFrames: withImages,
             whisperPlayers: !team,
+            publicStatusUpdates: team && profile.publicStatusUpdates,
         }).filter(t => !team || !['read_chat', 'read_plan', 'append_plan'].includes(t.name));
         let workspaceTools = team
             ? []
@@ -638,6 +639,7 @@ export async function startAgent(settings, options = {}) {
             sharedMachine: tools.some(t => t.name === 'shared_exec'),
             sharedPath: options.sharedMachinePath ?? '/shared',
             canFly: !bot.pi_no_flight,
+            publicStatusUpdates: team && profile.publicStatusUpdates,
         });
         runner = await createMinecraftSession({
             agentId: name,
