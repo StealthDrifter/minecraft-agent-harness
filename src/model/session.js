@@ -459,7 +459,14 @@ class MinecraftSession {
         this.compatible = result.compatible !== false;
         this.manager = result.sessionManager ?? this.session.sessionManager;
         const messages = this.manager.getEntries().filter(entry => entry.type === 'message').length;
-        this.sessionInfo = { file: this.manager.getSessionFile?.() ?? null, resumed: messages > 0, messages };
+        this.sessionInfo = {
+            file: this.manager.getSessionFile?.() ?? null,
+            resumed: messages > 0,
+            messages,
+            model: this.session.model?.id ?? this.options.model?.id ?? null,
+            contextWindow: this.session.model?.contextWindow ?? this.options.model?.contextWindow ?? null,
+            maxTokens: this.session.model?.maxTokens ?? this.options.model?.maxTokens ?? null,
+        };
         const interrupted = messages > 0 ? interruptedTurn(this.manager.getEntries()) : null;
         this.resume = resumePrompt({ reconnected: Boolean(this.options.reconnected), interrupted });
         if (interrupted) this.sessionInfo.interrupted = true;
