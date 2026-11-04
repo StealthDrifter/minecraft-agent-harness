@@ -602,12 +602,17 @@ class MinecraftSession {
             }
         }
         while (this.queue.size > this.options.maxQueue) this.queue.delete(this.queue.keys().next().value);
-        if (!this.paused && urgent && (!this.options.continuous || key === 'damage' || key === 'hit')) {
+        const operatorCommand = String(key ?? '').startsWith('human_command:');
+        if (
+            !this.paused &&
+            urgent &&
+            (!this.options.continuous || key === 'damage' || key === 'hit' || operatorCommand)
+        ) {
             this.nextWakeAt = this.clock.now();
             this.save();
             if (this.active) {
                 this.active.wakeAt ??= this.nextWakeAt;
-                if (interrupt && !this.options.continuous) this.stopCycle('interrupt');
+                if (interrupt && (!this.options.continuous || operatorCommand)) this.stopCycle('interrupt');
                 else if (restart && !(this.active.inTool > 0) && !this.active.stop) {
                     const now = this.clock.now(),
                         gap = this.options.hitRestartMs ?? 2000;
