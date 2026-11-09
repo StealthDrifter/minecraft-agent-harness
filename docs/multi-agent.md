@@ -57,6 +57,20 @@ shown by your local server if needed. `examples/dictator-swarm.json` adds a 9B O
 Both examples disable shell and shared-machine access. Human commands use `@all clear the trees to the north` or
 `@Worker02 gather the logs near spawn` in Minecraft chat.
 
+## Village run on OpenRouter
+
+`examples/village-openrouter.json` starts four independent villagers (Ada, Bram, Cleo, Dov) on a hosted model, with the
+objective of following the operator and otherwise building a small village together. Set `OPENROUTER_API_KEY`, then:
+
+```sh
+npm start -- team examples/village-openrouter.json
+```
+
+Hosted models avoid the slowdown a single local GPU shows when several agents prefill and decode at the same time.
+You can still mix: put `baseUrl` and `contextWindow` at the top of the file for local agents and set `"baseUrl": ""` on
+any agent that should use a hosted `openrouter/...` model instead. List catalog ids with
+`npx minecraft-agent models openrouter`.
+
 The complete experiment trace is written under `.agent-state/`. To share a run for analysis, provide the agents'
 `telemetry.jsonl` files; each record is one timestamped JSON object. The persistent Pi session files are also kept in
 `.agent-state/<agent>/pi-sessions/` if a deeper transcript is useful.
