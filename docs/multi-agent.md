@@ -95,9 +95,10 @@ finding it.
 ## Local village run
 
 `examples/village-local.json` is the same four villagers on a local `qwen3.5-4b@q4_k_m` through LM Studio. Load the
-model with `parallel` at least the number of agents and a total `context_length` of about `contextWindow` times that
-number, with Unified KV Cache off. With unified KV off llama.cpp-based servers typically split the loaded context between slots (not verified
-in LM Studio), so 4 agents at 16,000 each would need roughly 64,000 loaded. Staggering helps because requests then rarely mix prompt processing with generation.
+model with `parallel` at least the number of agents. With Unified KV Cache off, LM Studio gives every slot the full
+`context_length` (the server log shows `n_ctx_slot` equal to it and a total of that times `parallel`), so set it to
+about `contextWindow` and expect KV memory to grow with the number of agents. With it on, the slots share one
+context. Staggering helps because requests then rarely mix prompt processing with generation.
 
 ## Village run on OpenRouter
 

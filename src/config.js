@@ -145,6 +145,7 @@ export function resolveConfig(
             ...(raw.baseUrl && contextWindow !== undefined ? { contextWindow } : {}),
             ...(raw.baseUrl && maxTokens !== undefined ? { maxTokens } : {}),
             ...(raw.serviceTier ? { serviceTier: raw.serviceTier } : {}),
+            ...(raw.offEffort ? { offEffort: String(raw.offEffort) } : {}),
             ...(raw.requestTimeoutMs ? { requestTimeoutMs: Number(raw.requestTimeoutMs) } : {}),
             ...(raw.baseUrl && raw.apiKeyHeader && env.MODEL_API_KEY
                 ? { headers: { [raw.apiKeyHeader]: env.MODEL_API_KEY } }

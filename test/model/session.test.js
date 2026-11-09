@@ -477,6 +477,11 @@ test('Pi factory uses verified APIs: native-only, compatible Responses endpoint 
         );
         assert.equal(calls.provider.name, 'openai');
         assert.equal(calls.provider.config.api, 'openai-responses');
+        assert.equal(
+            calls.provider.config.models[0].thinkingLevelMap.off,
+            'none',
+            'thinking off requests no reasoning',
+        );
         calls.provider.config.streamSimple(
             model,
             { messages: [] },

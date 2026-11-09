@@ -85,7 +85,7 @@ async function registerCompatibleModel(modelRuntime, m, options, modules) {
                 maxTokens: m.maxTokens ?? 8192,
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
                 ...options.modelConfig,
-                thinkingLevelMap: { off: m.offEffort ?? 'low' },
+                thinkingLevelMap: { off: m.offEffort ?? 'none' },
                 id: m.id,
                 name: m.name ?? m.id,
                 reasoning: true,

@@ -86,7 +86,7 @@ MODEL_API_KEY=... npx minecraft-agent --base-url https://gateway.example.com/v1 
 
 The part before the slash names the provider; the rest is sent as the model id. The key in `MODEL_API_KEY` is sent as a
 bearer token. In a config file you can also set `apiKeyHeader` (for gateways that expect a header such as `api-key`),
-`serviceTier`, and `requestTimeoutMs`. For local endpoints, set `contextWindow` to the context size actually loaded in
+`serviceTier`, and `requestTimeoutMs`. `thinking: "off"` sends `reasoning.effort: "none"`; set `offEffort` (for example `"low"`) for a gateway that rejects `none`. Some local models, such as Qwen3.5 in LM Studio, only support thinking on or off, so `minimal`, `low`, `medium` and `high` all behave as on. For local endpoints, set `contextWindow` to the context size actually loaded in
  the server and `maxTokens` to the desired output limit. The harness uses `contextWindow` to trigger Pi's automatic
  conversation compaction; if it is larger than the server's real limit, requests can fail before compaction runs. The
  quick-swarm example uses 60,000 context tokens and a 2,048-token output limit; adjust those to match the model loaded
