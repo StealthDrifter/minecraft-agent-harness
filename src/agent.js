@@ -1,3 +1,4 @@
+import { createAnomalyLayer } from './body/anomalies.js';
 import { createViewLog } from './body/viewlog.js';
 import { installRespawn } from './body/respawn.js';
 import { once } from 'node:events';
@@ -475,8 +476,12 @@ export async function startAgent(settings, options = {}) {
                 capturedAt: new Date().toISOString(),
             };
         };
+        const anomalies = createAnomalyLayer(profile.anomalies, {
+            onApply: detail => record('anomaly_applied', detail),
+        });
         const observeWorld = createObservation({
             bot,
+            anomalies,
             perception,
             world,
             captureFrame: withImages ? captureFrame : undefined,
@@ -486,6 +491,7 @@ export async function startAgent(settings, options = {}) {
             bot,
             isVisible: perception.isEntityVisible,
             exclude: entity => peers.includes(entity.username),
+            transform: anomalies.apply,
         });
         timers.push(
             setInterval(() => {

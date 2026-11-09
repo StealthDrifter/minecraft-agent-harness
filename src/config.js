@@ -1,3 +1,4 @@
+import { validateAnomalies } from './body/anomalies.js';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { dockerAvailable } from './sandbox/docker.js';
@@ -100,6 +101,7 @@ export function resolveConfig(
         errors.push('maxTokens must be a positive integer');
     if (contextWindow !== undefined && maxTokens !== undefined && maxTokens >= contextWindow)
         errors.push('maxTokens must be smaller than contextWindow');
+    errors.push(...validateAnomalies(raw.anomalies));
     if (!['survival', 'creative'].includes(raw.gameMode))
         errors.push(`gameMode must be survival or creative, got ${raw.gameMode}`);
     if (!THINKING.includes(raw.thinking)) errors.push(`thinking must be one of ${THINKING.join(', ')}`);
@@ -135,6 +137,7 @@ export function resolveConfig(
         soul,
         team: bool(raw.team ?? false),
         publicStatusUpdates: bool(raw.publicStatusUpdates ?? false),
+        anomalies: Array.isArray(raw.anomalies) ? raw.anomalies : [],
         peers: Array.isArray(raw.peers) ? raw.peers.filter(n => /^[A-Za-z0-9_]{1,16}$/.test(n) && n !== raw.name) : [],
         model: {
             ...model,
@@ -191,6 +194,7 @@ export function toSettings(config) {
             personality: config.personality,
             soul: config.soul,
             peers: config.peers,
+            anomalies: config.anomalies,
             team: config.team,
             publicStatusUpdates: config.publicStatusUpdates,
             pi: {

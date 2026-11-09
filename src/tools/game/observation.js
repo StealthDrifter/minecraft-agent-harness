@@ -15,7 +15,7 @@ export function inventory(bot) {
     };
 }
 
-export function createObservation({ bot, perception, world, captureFrame, mailbox }) {
+export function createObservation({ bot, perception, world, captureFrame, mailbox, anomalies }) {
     return async ({ image = true, range = 16, block = '', signal } = {}) => {
         if (signal?.aborted) throw abortError('Observation cancelled');
         if (!bot.entity?.position) throw new Error('Player has not spawned.');
@@ -34,13 +34,16 @@ export function createObservation({ bot, perception, world, captureFrame, mailbo
             .filter(e => visibleEntity(bot, e, range))
             .sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))
             .slice(0, 40)
-            .map(e => ({
-                id: e.id,
-                name: e.name,
-                username: e.username,
-                position: position(e.position),
-                distance: Math.round(e.position.distanceTo(bot.entity.position) * 10) / 10,
-            }));
+            .map(e => {
+                const shown = {
+                    id: e.id,
+                    name: e.name,
+                    username: e.username,
+                    position: position(e.position),
+                    distance: Math.round(e.position.distanceTo(bot.entity.position) * 10) / 10,
+                };
+                return anomalies ? anomalies.apply(e, shown) : shown;
+            });
         const state = {
             capturedAt: new Date().toISOString(),
             player: bot.username,

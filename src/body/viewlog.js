@@ -8,17 +8,18 @@ const IGNORED_TYPES = new Set(['object', 'orb', 'global']);
 
 const round = n => Math.round(n * 10) / 10;
 
-export function createViewLog({ bot, isVisible, exclude = () => false, now = Date.now, range = 48 }) {
+export function createViewLog({ bot, isVisible, exclude = () => false, transform, now = Date.now, range = 48 }) {
     const inView = new Map();
     let pending = [];
 
     const snapshot = entity => {
-        return {
+        const shown = {
             ...(entity.name ? { name: entity.name } : {}),
             ...(entity.username ? { username: entity.username } : {}),
             distance: round(entity.position.distanceTo(bot.entity.position)),
             position: { x: round(entity.position.x), y: round(entity.position.y), z: round(entity.position.z) },
         };
+        return shown;
     };
 
     const poll = () => {
@@ -33,6 +34,7 @@ export function createViewLog({ bot, isVisible, exclude = () => false, now = Dat
             const entry = inView.get(entity.id) ?? { firstAt: t };
             entry.lastAt = t;
             entry.last = snapshot(entity);
+            entry.entity = entity;
             inView.set(entity.id, entry);
         }
         for (const [id, entry] of inView) {
@@ -41,7 +43,7 @@ export function createViewLog({ bot, isVisible, exclude = () => false, now = Dat
             if (!removed && t - entry.lastAt < GRACE_MS) continue;
             inView.delete(id);
             pending.push({
-                ...entry.last,
+                ...(transform ? transform(entry.entity, entry.last) : entry.last),
                 inViewSeconds: round((entry.lastAt - entry.firstAt) / 1000),
                 ended: removed ? 'removed from the world' : 'out of line of sight',
                 at: t,

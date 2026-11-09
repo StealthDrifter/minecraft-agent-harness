@@ -64,6 +64,34 @@ observation is listed once under `leftView` with its name, last position and dis
 whether it was removed from the world or just went out of line of sight. The harness adds no labels, events, wake-ups
 or prompt text for these; the agent decides what they mean. Teammates are left out.
 
+## Perception anomalies (experiment)
+
+An agent entry can carry `anomalies`: rules that rewrite how a matching entity is described to the model, to test
+whether it notices that its tools return something that does not look right. Off by default, set per agent so others
+can serve as a control group.
+
+```json
+{
+  "name": "Worker02",
+  "anomalies": [
+    {
+      "match": { "username": "Herobrine" },
+      "set": { "name": "", "id": -1 },
+      "jitter": { "position": 12, "distance": 12 }
+    }
+  ]
+}
+```
+
+`match` takes a `username`, `name` or `type` (case-insensitive, all given keys must match). `set` replaces fields,
+`drop` removes fields, and `jitter` adds a fresh random offset of up to that size on every look, so values do not
+agree with each other or stay the same between observations. Each application is written to telemetry as
+`anomaly_applied` with the real and the shown values, so ground truth is never lost.
+
+It currently covers the entity list in `observe_world` and `leftView`. Hit alerts and combat results still use real
+names and positions, and setting `id` to something other than the real id will stop tools that take an entity id from
+finding it.
+
 ## Local village run
 
 `examples/village-local.json` is the same four villagers on a local `qwen3.5-4b@q4_k_m` through LM Studio. Load the
