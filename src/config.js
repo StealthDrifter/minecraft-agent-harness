@@ -135,6 +135,9 @@ export function resolveConfig(
         soul,
         team: bool(raw.team ?? false),
         publicStatusUpdates: bool(raw.publicStatusUpdates ?? false),
+        knownPlayers: Array.isArray(raw.knownPlayers)
+            ? raw.knownPlayers.filter(n => /^[A-Za-z0-9_]{1,16}$/.test(n))
+            : [],
         peers: Array.isArray(raw.peers) ? raw.peers.filter(n => /^[A-Za-z0-9_]{1,16}$/.test(n) && n !== raw.name) : [],
         model: {
             ...model,
@@ -191,6 +194,7 @@ export function toSettings(config) {
             personality: config.personality,
             soul: config.soul,
             peers: config.peers,
+            knownPlayers: config.knownPlayers,
             team: config.team,
             publicStatusUpdates: config.publicStatusUpdates,
             pi: {

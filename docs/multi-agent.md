@@ -57,6 +57,21 @@ shown by your local server if needed. `examples/dictator-swarm.json` adds a 9B O
 Both examples disable shell and shared-machine access. Human commands use `@all clear the trees to the north` or
 `@Worker02 gather the logs near spawn` in Minecraft chat.
 
+## Unfamiliar figures
+
+Players that are not teammates, `knownPlayers` entries or someone who has given the agent an order are treated as
+unfamiliar figures, as are entities with no recognised name. When one comes into view the agent gets a `sighting`
+event, and when it disappears a `figure_lost` event says whether it vanished suddenly or moved out of sight. The last
+few are kept as `recentSightings` in every observation, and observation entities carry `distance` and `direction`.
+List your own Minecraft name in `knownPlayers` so you are not reported as a figure before your first command.
+
+## Local village run
+
+`examples/village-local.json` is the same four villagers on a local `qwen3.5-4b@q4_k_m` through LM Studio. Load the
+model with `parallel` at least the number of agents and a total `context_length` of about `contextWindow` times that
+number, with Unified KV Cache off. With unified KV off llama.cpp-based servers typically split the loaded context between slots (not verified
+in LM Studio), so 4 agents at 16,000 each would need roughly 64,000 loaded. Staggering helps because requests then rarely mix prompt processing with generation.
+
 ## Village run on OpenRouter
 
 `examples/village-openrouter.json` starts four independent villagers (Ada, Bram, Cleo, Dov) on a hosted model, with the

@@ -1,0 +1,34 @@
+{
+  "host": "localhost",
+  "port": 25565,
+  "baseUrl": "http://127.0.0.1:1234/v1",
+  "contextWindow": 16000,
+  "maxTokens": 2048,
+  "model": "local/qwen3.5-4b@q4_k_m",
+  "modelName": "Qwen3.5-4B",
+  "thinking": "low",
+  "publicStatusUpdates": true,
+  "knownPlayers": ["StealthDrifter"],
+  "objective": "Follow commands from the human operator. When you have no order, work with the other villagers to grow a small village and progress in the game: wood and tools, a safe shelter, food, then houses. Agree on who does what by messaging each other, and stay safe.",
+  "sandbox": "none",
+  "sharedMachine": "none",
+  "staggerSeconds": 6,
+  "agents": [
+    {
+      "name": "Ada",
+      "personality": "Organised and sociable. Likes to propose a plan and check that everyone has a job."
+    },
+    {
+      "name": "Bram",
+      "personality": "Independent explorer. Prefers to scout and gather rare resources, and will push back on plans he thinks are wasteful."
+    },
+    {
+      "name": "Cleo",
+      "personality": "Careful builder. Cares about safety, light and food before anything else."
+    },
+    {
+      "name": "Dov",
+      "personality": "Practical miner. Keeps the group supplied with stone, coal and tools."
+    }
+  ]
+}

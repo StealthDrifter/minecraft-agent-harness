@@ -1,3 +1,4 @@
+import { createSightingTracker, sightingText } from './body/sightings.js';
 import { installRespawn } from './body/respawn.js';
 import { once } from 'node:events';
 import { installOxygenIsolation } from './body/oxygen.js';
@@ -90,6 +91,8 @@ export async function startAgent(settings, options = {}) {
     const timers = [],
         peers = [...(Array.isArray(profile.peers) ? profile.peers : [])];
     const team = profile.team === true;
+    // Players the agent already has a reason to know (teammates, the operator) are not reported as figures.
+    const knownNames = new Set([...peers, ...(Array.isArray(profile.knownPlayers) ? profile.knownPlayers : [])]);
     checkpoint();
     const bot = initBot(name);
     bot.pi_no_flight = options.allowFlight !== true;
@@ -332,6 +335,7 @@ export async function startAgent(settings, options = {}) {
                     return;
                 const sequence = ++commandSeq;
                 record('human_command', { from, recipient, text: command, sequence });
+                knownNames.add(from);
                 operatorOrders.push({ from, text: command.slice(0, 300), at: Date.now() });
                 if (operatorOrders.length > 3) operatorOrders.shift();
                 runner?.enqueue(
@@ -481,6 +485,32 @@ export async function startAgent(settings, options = {}) {
             captureFrame: withImages ? captureFrame : undefined,
             mailbox,
         });
+        const sightings = createSightingTracker({
+            bot,
+            isVisible: perception.isEntityVisible,
+            isKnown: username => knownNames.has(username),
+            onEvent: event => {
+                record(event.kind, event);
+                runner?.enqueue(
+                    { kind: event.kind, text: sightingText(event), ...event },
+                    {
+                        key: `${event.kind}:${event.figure?.id ?? event.lastSeen?.id}`,
+                        urgent: true,
+                        interrupt: false,
+                    },
+                );
+            },
+        });
+        timers.push(
+            setInterval(() => {
+                if (closing) return;
+                try {
+                    sightings.poll();
+                } catch (error) {
+                    record('sighting_error', safeError(error));
+                }
+            }, 400),
+        );
         let hitInfoAt = -Infinity;
         const hitAlert = () => {
             const unseen = hurtLog.filter(ev => !ev.shown);
@@ -494,9 +524,11 @@ export async function startAgent(settings, options = {}) {
             const current = await observeWorld(options);
             const alert = hitAlert();
             const orders = team ? orderLines() : [];
+            const seenFigures = sightings.recentSightings();
             const state = {
                 ...(alert ? { alert } : {}),
                 ...(orders.length ? { operatorOrders: orders } : {}),
+                ...(seenFigures.length ? { recentSightings: seenFigures } : {}),
                 ...current.state,
             };
             if (team) {

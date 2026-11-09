@@ -4,6 +4,7 @@
   "model": "openrouter/google/gemini-3.5-flash-lite",
   "thinking": "low",
   "publicStatusUpdates": true,
+  "knownPlayers": ["StealthDrifter"],
   "objective": "Follow commands from the human operator. When you have no order, work with the other villagers to grow a small village and progress in the game: wood and tools, a safe shelter, food, then houses. Agree on who does what by messaging each other, and stay safe.",
   "sandbox": "none",
   "sharedMachine": "none",
@@ -17,7 +18,13 @@
       "name": "Bram",
       "personality": "Independent explorer. Prefers to scout and gather rare resources, and will push back on plans he thinks are wasteful."
     },
-    { "name": "Cleo", "personality": "Careful builder. Cares about safety, light and food before anything else." },
-    { "name": "Dov", "personality": "Practical miner. Keeps the group supplied with stone, coal and tools." }
+    {
+      "name": "Cleo",
+      "personality": "Careful builder. Cares about safety, light and food before anything else."
+    },
+    {
+      "name": "Dov",
+      "personality": "Practical miner. Keeps the group supplied with stone, coal and tools."
+    }
   ]
 }
