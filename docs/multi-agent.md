@@ -57,13 +57,12 @@ shown by your local server if needed. `examples/dictator-swarm.json` adds a 9B O
 Both examples disable shell and shared-machine access. Human commands use `@all clear the trees to the north` or
 `@Worker02 gather the logs near spawn` in Minecraft chat.
 
-## Unfamiliar figures
+## Entities that left view
 
-Players that are not teammates, `knownPlayers` entries or someone who has given the agent an order are treated as
-unfamiliar figures, as are entities with no recognised name. When one comes into view the agent gets a `sighting`
-event, and when it disappears a `figure_lost` event says whether it vanished suddenly or moved out of sight. The last
-few are kept as `recentSightings` in every observation, and observation entities carry `distance` and `direction`.
-List your own Minecraft name in `knownPlayers` so you are not reported as a figure before your first command.
+Observation entities carry `distance` and `direction`. Anything that came into view and was gone by the next
+observation is listed once under `leftView` with its name, last distance and direction, how long it was in view, and
+whether it was removed from the world or just went out of line of sight. The harness adds no labels, events, wake-ups
+or prompt text for these; the agent decides what they mean. Teammates are left out.
 
 ## Local village run
 

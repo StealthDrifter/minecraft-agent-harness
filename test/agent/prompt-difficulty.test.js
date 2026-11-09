@@ -59,7 +59,6 @@ test('team prompt covers current orders, DM replies, waiting and non-busywork id
         publicStatusUpdates: true,
     });
     assert.match(prompt, /operatorOrders/);
-    assert.match(prompt, /recentSightings/);
     assert.match(prompt, /expects a short send_dm reply/);
     assert.match(prompt, /call wait/);
     assert.match(

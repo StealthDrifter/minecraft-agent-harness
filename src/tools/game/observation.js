@@ -1,4 +1,4 @@
-import { bearingTo } from '../../body/sightings.js';
+import { bearingTo } from '../../body/viewlog.js';
 import { abortError } from './failures.js';
 import { DOORISH, doorOpen } from './guards.js';
 import { requireFunction } from './runtime.js';
