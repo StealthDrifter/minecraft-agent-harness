@@ -1,30 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vec3 } from 'vec3';
-import { bearingTo, createViewLog } from '../../src/body/viewlog.js';
+import { createViewLog } from '../../src/body/viewlog.js';
 
-function fixture({ yaw = 0, exclude } = {}) {
+function fixture({ exclude } = {}) {
     let clock = 1_000_000;
-    const bot = { username: 'Ada', entity: { id: 1, position: new Vec3(0, 64, 0), yaw }, entities: {} };
+    const bot = { username: 'Ada', entity: { id: 1, position: new Vec3(0, 64, 0), yaw: 0 }, entities: {} };
     bot.entities[1] = bot.entity;
     const hidden = new Set();
     const log = createViewLog({ bot, isVisible: (_bot, e) => !hidden.has(e.id), exclude, now: () => clock });
     const add = (id, patch) => (bot.entities[id] = { id, position: new Vec3(0, 64, -10), ...patch });
     return { bot, log, add, hidden, advance: ms => (clock += ms) };
 }
-
-test('bearing: compass heading and side relative to where the bot faces', () => {
-    const { bot } = fixture({ yaw: 0 });
-    assert.deepEqual(bearingTo(bot, new Vec3(0, 64, -10)), { compass: 'north', relative: 'ahead' });
-    assert.deepEqual(bearingTo(bot, new Vec3(-10, 64, 0)), { compass: 'west', relative: 'left' });
-    assert.deepEqual(bearingTo(bot, new Vec3(10, 64, 0)), { compass: 'east', relative: 'right' });
-    assert.deepEqual(bearingTo(bot, new Vec3(0, 64, 10)), { compass: 'south', relative: 'behind' });
-});
-
-test('bearing follows the bot yaw (facing west, a west target is ahead)', () => {
-    const { bot } = fixture({ yaw: Math.PI / 2 });
-    assert.deepEqual(bearingTo(bot, new Vec3(-10, 64, 0)), { compass: 'west', relative: 'ahead' });
-});
 
 test('something still in view is not listed; something removed from the world is, once', () => {
     const { log, add, advance, bot } = fixture();
@@ -39,6 +26,7 @@ test('something still in view is not listed; something removed from the world is
     const [entry] = log.drain();
     assert.equal(entry.username, 'Stranger');
     assert.equal(entry.distance, 10);
+    assert.deepEqual(entry.position, { x: 0, y: 64, z: -10 });
     assert.equal(entry.inViewSeconds, 3);
     assert.equal(entry.ended, 'removed from the world');
     assert.deepEqual(log.drain(), []);

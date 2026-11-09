@@ -1,4 +1,3 @@
-import { bearingTo } from '../../body/viewlog.js';
 import { abortError } from './failures.js';
 import { DOORISH, doorOpen } from './guards.js';
 import { requireFunction } from './runtime.js';
@@ -35,17 +34,13 @@ export function createObservation({ bot, perception, world, captureFrame, mailbo
             .filter(e => visibleEntity(bot, e, range))
             .sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))
             .slice(0, 40)
-            .map(e => {
-                const { compass, relative } = bearingTo(bot, e.position);
-                return {
-                    id: e.id,
-                    name: e.name,
-                    username: e.username,
-                    position: position(e.position),
-                    distance: Math.round(e.position.distanceTo(bot.entity.position) * 10) / 10,
-                    direction: `${compass}, ${relative}`,
-                };
-            });
+            .map(e => ({
+                id: e.id,
+                name: e.name,
+                username: e.username,
+                position: position(e.position),
+                distance: Math.round(e.position.distanceTo(bot.entity.position) * 10) / 10,
+            }));
         const state = {
             capturedAt: new Date().toISOString(),
             player: bot.username,

@@ -59,8 +59,8 @@ Both examples disable shell and shared-machine access. Human commands use `@all 
 
 ## Entities that left view
 
-Observation entities carry `distance` and `direction`. Anything that came into view and was gone by the next
-observation is listed once under `leftView` with its name, last distance and direction, how long it was in view, and
+Observation entities carry `distance`. Anything that came into view and was gone by the next
+observation is listed once under `leftView` with its name, last position and distance, how long it was in view, and
 whether it was removed from the world or just went out of line of sight. The harness adds no labels, events, wake-ups
 or prompt text for these; the agent decides what they mean. Teammates are left out.
 

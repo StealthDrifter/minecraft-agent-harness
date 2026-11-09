@@ -2,39 +2,22 @@
 // before the next one would leave no trace. This keeps a plain factual list of such entities for the next
 // observation. It adds no labels, events or wake-ups; what any of it means is up to the agent.
 
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
-const RELATIVE = ['ahead', 'ahead-right', 'right', 'behind-right', 'behind', 'behind-left', 'left', 'ahead-left'];
 const GRACE_MS = 1500;
 const MAX_PENDING = 6;
 const IGNORED_TYPES = new Set(['object', 'orb', 'global']);
 
 const round = n => Math.round(n * 10) / 10;
-const mod360 = deg => ((deg % 360) + 360) % 360;
-
-export function bearingTo(bot, position) {
-    const dx = position.x - bot.entity.position.x;
-    const dz = position.z - bot.entity.position.z;
-    // Minecraft: north is -z, east is +x. Mineflayer yaw 0 faces north and grows towards the west (left),
-    // so a clockwise compass heading is -yaw.
-    const toTarget = mod360((Math.atan2(dx, -dz) * 180) / Math.PI);
-    const facing = mod360((-bot.entity.yaw * 180) / Math.PI);
-    return {
-        compass: COMPASS[Math.round(toTarget / 45) % 8],
-        relative: RELATIVE[Math.round(mod360(toTarget - facing) / 45) % 8],
-    };
-}
 
 export function createViewLog({ bot, isVisible, exclude = () => false, now = Date.now, range = 48 }) {
     const inView = new Map();
     let pending = [];
 
     const snapshot = entity => {
-        const { compass, relative } = bearingTo(bot, entity.position);
         return {
             ...(entity.name ? { name: entity.name } : {}),
             ...(entity.username ? { username: entity.username } : {}),
             distance: round(entity.position.distanceTo(bot.entity.position)),
-            direction: `${compass}, ${relative}`,
+            position: { x: round(entity.position.x), y: round(entity.position.y), z: round(entity.position.z) },
         };
     };
 
