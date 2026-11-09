@@ -101,6 +101,11 @@ export function resolveConfig(
         errors.push('maxTokens must be a positive integer');
     if (contextWindow !== undefined && maxTokens !== undefined && maxTokens >= contextWindow)
         errors.push('maxTokens must be smaller than contextWindow');
+    if (
+        raw.thinkingBudgetTokens !== undefined &&
+        !(Number.isInteger(Number(raw.thinkingBudgetTokens)) && Number(raw.thinkingBudgetTokens) >= 0)
+    )
+        errors.push('thinkingBudgetTokens must be a non-negative integer');
     errors.push(...validateAnomalies(raw.anomalies));
     if (!['survival', 'creative'].includes(raw.gameMode))
         errors.push(`gameMode must be survival or creative, got ${raw.gameMode}`);
@@ -146,6 +151,9 @@ export function resolveConfig(
             ...(raw.baseUrl && maxTokens !== undefined ? { maxTokens } : {}),
             ...(raw.serviceTier ? { serviceTier: raw.serviceTier } : {}),
             ...(raw.offEffort ? { offEffort: String(raw.offEffort) } : {}),
+            ...(raw.baseUrl && raw.thinkingBudgetTokens !== undefined
+                ? { thinkingBudgetTokens: Number(raw.thinkingBudgetTokens) }
+                : {}),
             ...(raw.requestTimeoutMs ? { requestTimeoutMs: Number(raw.requestTimeoutMs) } : {}),
             ...(raw.baseUrl && raw.apiKeyHeader && env.MODEL_API_KEY
                 ? { headers: { [raw.apiKeyHeader]: env.MODEL_API_KEY } }

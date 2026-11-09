@@ -1383,3 +1383,72 @@ test('an urgent DM wakes an idle continuous agent that is waiting', async () => 
     assert.equal(turns, 2, 'DM woke the waiting agent without waiting 60 s');
     await f.runner.close();
 });
+
+test('thinkingBudgetTokens routes through chat completions and sends a hard cap (0 when thinking is off)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pi-session-budget-'));
+    try {
+        const calls = {};
+        const model = { id: 'test-model', maxTokens: 4096 };
+        const sdk = {
+            SettingsManager: { inMemory: settings => settings },
+            ModelRuntime: {
+                create: async () => ({
+                    registerProvider: (name, config) => {
+                        calls.provider = { name, config };
+                    },
+                    setRuntimeApiKey: async () => {},
+                    getModel: () => model,
+                }),
+            },
+            DefaultResourceLoader: class {
+                async reload() {}
+            },
+            SessionManager: { continueRecent: () => store() },
+            createAgentSession: async () => ({ session: {} }),
+        };
+        await createPiSession(
+            {
+                agentId: 'one',
+                cwd: '/synthetic',
+                sessionDir: root,
+                systemPrompt: 'rules',
+                tools: [tool('noop', async () => ({ content: [] }))],
+                apiKey: 'SYNTHETIC',
+                model: {
+                    provider: 'local',
+                    id: 'test-model',
+                    baseUrl: 'http://127.0.0.1:1234/v1',
+                    thinkingBudgetTokens: 256,
+                },
+            },
+            {
+                sdk,
+                completions: {
+                    stream: (...args) => {
+                        calls.stream = args;
+                        return 'synthetic stream';
+                    },
+                },
+            },
+        );
+        assert.equal(calls.provider.config.api, 'openai-completions');
+        assert.equal(calls.provider.config.models[0].api, 'openai-completions');
+        const send = async reasoning => {
+            calls.provider.config.streamSimple(
+                model,
+                { messages: [] },
+                {
+                    reasoning,
+                    onPayload: p => ({ ...p, marker: true }),
+                },
+            );
+            return calls.stream[2].onPayload({ model: 'x' }, model);
+        };
+        assert.deepEqual(await send('medium'), { model: 'x', marker: true, thinking_budget_tokens: 256 });
+        assert.equal((await send('off')).thinking_budget_tokens, 0);
+        assert.equal(calls.stream[2].reasoningEffort, undefined);
+        assert.equal(calls.stream[2].maxTokens, 4096);
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
+});

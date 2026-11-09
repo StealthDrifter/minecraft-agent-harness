@@ -73,7 +73,64 @@ async function resolveCatalogModel(modelRuntime, m, options) {
     return model;
 }
 
+// LM Studio only honours a hard thinking cap (`thinking_budget_tokens`) on its chat completions route, so
+// `thinkingBudgetTokens` switches the endpoint from the Responses API to chat completions.
+async function registerBudgetedModel(modelRuntime, m, options, modules) {
+    const completions = modules?.completions ?? (await import('@earendil-works/pi-ai/api/openai-completions'));
+    const provider = m.provider || 'custom';
+    modelRuntime.registerProvider(provider, {
+        api: 'openai-completions',
+        baseUrl: m.baseUrl,
+        models: [
+            {
+                contextWindow: m.contextWindow ?? 128000,
+                maxTokens: m.maxTokens ?? 8192,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                ...options.modelConfig,
+                id: m.id,
+                name: m.name ?? m.id,
+                reasoning: true,
+                input: m.input ?? ['text', 'image'],
+                api: 'openai-completions',
+                compat: {
+                    supportsStore: false,
+                    supportsDeveloperRole: false,
+                    supportsReasoningEffort: false,
+                    supportsUsageInStreaming: true,
+                    maxTokensField: 'max_tokens',
+                },
+            },
+        ],
+        streamSimple: (model, context, streamOptions) => {
+            const off = !streamOptions?.reasoning || streamOptions.reasoning === 'off';
+            const previous = streamOptions?.onPayload;
+            return completions.stream(model, context, {
+                ...streamOptions,
+                reasoningEffort: undefined,
+                maxTokens: Math.min(streamOptions?.maxTokens ?? model.maxTokens, model.maxTokens),
+                onPayload: async (params, target) => ({
+                    ...((await previous?.(params, target)) ?? params),
+                    thinking_budget_tokens: off ? 0 : m.thinkingBudgetTokens,
+                }),
+                ...(m.headers ? { headers: { ...streamOptions?.headers, ...m.headers } } : {}),
+                ...(m.requestTimeoutMs
+                    ? {
+                          signal: streamOptions?.signal
+                              ? AbortSignal.any([streamOptions.signal, AbortSignal.timeout(m.requestTimeoutMs)])
+                              : AbortSignal.timeout(m.requestTimeoutMs),
+                      }
+                    : {}),
+            });
+        },
+    });
+    if (options.apiKey) await modelRuntime.setRuntimeApiKey(provider, options.apiKey);
+    const model = modelRuntime.getModel(provider, m.id);
+    if (!model) throw new Error('Model registration failed');
+    return model;
+}
+
 async function registerCompatibleModel(modelRuntime, m, options, modules) {
+    if (Number.isInteger(m.thinkingBudgetTokens)) return registerBudgetedModel(modelRuntime, m, options, modules);
     const responses = modules?.responses ?? (await import('@earendil-works/pi-ai/api/openai-responses'));
     const provider = m.provider || 'custom';
     modelRuntime.registerProvider(provider, {

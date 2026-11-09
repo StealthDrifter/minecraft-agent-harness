@@ -7,6 +7,7 @@
   "model": "local/qwen3.5-4b@q4_k_m",
   "modelName": "Qwen3.5-4B",
   "thinking": "low",
+  "thinkingBudgetTokens": 256,
   "publicStatusUpdates": true,
   "objective": "Follow commands from the human operator. When you have no order, work with the other villagers to grow a small village and progress in the game: wood and tools, a safe shelter, food, then houses. Agree on who does what by messaging each other, and stay safe.",
   "sandbox": "none",
