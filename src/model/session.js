@@ -96,6 +96,7 @@ async function registerCompatibleModel(modelRuntime, m, options, modules) {
         streamSimple: (model, context, streamOptions) =>
             responses.stream(model, context, {
                 ...streamOptions,
+                ...reasoningOptions(streamOptions?.reasoning),
                 maxTokens: Math.min(streamOptions?.maxTokens ?? model.maxTokens, model.maxTokens),
                 ...(m.headers ? { headers: { ...streamOptions?.headers, ...m.headers } } : {}),
                 ...(m.serviceTier ? { serviceTier: m.serviceTier } : {}),
@@ -112,6 +113,15 @@ async function registerCompatibleModel(modelRuntime, m, options, modules) {
     const model = modelRuntime.getModel(provider, m.id);
     if (!model) throw new Error('Model registration failed');
     return model;
+}
+
+// The SDK's own streamSimple turns the agent's `reasoning` level into `reasoningEffort`; the
+// lower-level responses.stream only reads `reasoningEffort`, so without this conversion every
+// request fell back to the model's `off` mapping ("low") whatever `thinking` was configured.
+const EFFORT_FOR_LEVEL = { minimal: 'low', low: 'low', medium: 'medium', high: 'high', xhigh: 'high' };
+export function reasoningOptions(level) {
+    const effort = EFFORT_FOR_LEVEL[level];
+    return effort ? { reasoningEffort: effort } : {};
 }
 
 const BREAKPOINT_TYPES = new Set(['input_text', 'input_image', 'input_file']);
@@ -319,6 +329,8 @@ const IDLE_TOOLS = new Set([
     'directory_search',
     'inventory',
 ]);
+
+const isOperatorKey = key => String(key ?? '').startsWith('human_command:');
 
 class MinecraftSession {
     constructor(options, dependencies) {
@@ -536,8 +548,13 @@ class MinecraftSession {
         };
         const originalPayload = this.session.agent.onPayload?.bind(this.session.agent);
         this.session.agent.onPayload = async (payload, model) => {
-            const base = originalPayload ? ((await originalPayload(payload, model)) ?? payload) : payload;
+            let base = originalPayload ? ((await originalPayload(payload, model)) ?? payload) : payload;
             if (!this.compatible) return base;
+            // Local OpenAI-compatible servers cannot return encrypted reasoning, so do not ask for it.
+            if (base && typeof base === 'object' && 'include' in base) {
+                const { include: _include, ...rest } = base;
+                base = rest;
+            }
             if (/claude/i.test(String(base?.model ?? model?.id ?? ''))) return anthropicPayload(base);
             return this.options.cacheBreakpoint === false ? base : markCacheBreakpoint(base);
         };
@@ -601,12 +618,16 @@ class MinecraftSession {
                 this.arm(this.nextWakeAt);
             }
         }
-        while (this.queue.size > this.options.maxQueue) this.queue.delete(this.queue.keys().next().value);
-        const operatorCommand = String(key ?? '').startsWith('human_command:');
+        while (this.queue.size > this.options.maxQueue) {
+            // Never drop an operator command while anything less important is queued.
+            const victim = [...this.queue.keys()].find(k => !isOperatorKey(k)) ?? this.queue.keys().next().value;
+            this.queue.delete(victim);
+        }
+        const operatorCommand = isOperatorKey(key);
         if (
             !this.paused &&
             urgent &&
-            (!this.options.continuous || key === 'damage' || key === 'hit' || operatorCommand)
+            (!this.options.continuous || key === 'damage' || key === 'hit' || operatorCommand || !this.active)
         ) {
             this.nextWakeAt = this.clock.now();
             this.save();
@@ -698,6 +719,7 @@ class MinecraftSession {
         if (resume && this.options.resumeThinkingLevel) this.setThinking(this.options.resumeThinkingLevel);
         try {
             const headline = this.options.turnHeadline?.();
+            if (cycle.events.length) metric(this.options.onEventsDelivered, { events: cycle.events });
             await this.session.prompt(
                 (resume ? `${resume}\n\n` : '') +
                     (headline ? `${headline}\n\n` : '') +
@@ -854,7 +876,8 @@ class MinecraftSession {
         this.paused = true;
         if (this.timer !== null) this.clock.clearTimeout(this.timer);
         this.timer = null;
-        this.queue.clear();
+        // Operator commands survive a cancel (e.g. death and respawn); everything else is stale.
+        for (const key of [...this.queue.keys()]) if (!isOperatorKey(key)) this.queue.delete(key);
         this.nextWakeAt = null;
         this.stopCycle('cancel');
         await this.idle();

@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMinecraftSession, createPiSession, interruptedTurn, resumePrompt } from '../../src/model/session.js';
+import {
+    createMinecraftSession,
+    createPiSession,
+    interruptedTurn,
+    reasoningOptions,
+    resumePrompt,
+} from '../../src/model/session.js';
 import { createGameTools } from '../../src/tools/game-tools.js';
 
 const flush = async () => {
@@ -478,7 +484,7 @@ test('Pi factory uses verified APIs: native-only, compatible Responses endpoint 
         );
         assert.equal(calls.stream[2].serviceTier, 'priority');
         assert.equal(calls.stream[2].maxTokens, 8192);
-        assert.equal(calls.stream[2].reasoningEffort, undefined);
+        assert.equal(calls.stream[2].reasoningEffort, 'high', 'configured thinking reaches the request');
         assert.equal(calls.stream[2].reasoning, 'high');
         assert.equal(calls.stream[2].signal, 'signal');
         assert.equal(calls.stream[2].sessionId, 'stable');
@@ -1150,9 +1156,13 @@ test('hit restart: a call that already knows about the fight is not cancelled; a
     await f.runner.close();
 });
 
-test('tool telemetry carries clipped args and a short result for the activity log', async () => {
+test('tool telemetry carries structured args and the full result for the activity log', async () => {
     const f = await fixture({
-        tools: [tool('act', async () => ({ content: [{ type: 'text', text: `done ${'x'.repeat(400)}` }] }))],
+        tools: [
+            tool('act', async () => ({
+                content: [{ type: 'text', text: `done ${'gathered oak logs. '.repeat(20)}` }],
+            })),
+        ],
     });
     f.fake.script = async () => {
         await f.fake.context();
@@ -1160,9 +1170,9 @@ test('tool telemetry carries clipped args and a short result for the activity lo
     };
     f.runner.start();
     await f.clock.advance();
-    assert.equal(f.fullTelemetry[0].args, '{"block":"oak_log","count":4}');
-    assert.match(f.fullTelemetry[0].result, /^done x+\.\.\.$/);
-    assert.ok(f.fullTelemetry[0].result.length <= 303);
+    assert.deepEqual(f.fullTelemetry[0].args, { block: 'oak_log', count: 4 });
+    assert.match(f.fullTelemetry[0].result, /^done gathered oak logs\. /);
+    assert.ok(f.fullTelemetry[0].result.length > 300, 'results are logged in full, not clipped');
     await f.runner.close();
 });
 
@@ -1278,4 +1288,93 @@ test('the first turn after a resume gets the resume note and low thinking until 
     assert.equal(levels.at(-1), 'medium');
     assert.equal(levels.length, actedAt + 2);
     assert.ok(levels.slice(0, -1).every(level => level === 'minimal'));
+});
+
+test('reasoning levels convert to a request effort; off sends none', () => {
+    assert.deepEqual(reasoningOptions('medium'), { reasoningEffort: 'medium' });
+    assert.deepEqual(reasoningOptions('minimal'), { reasoningEffort: 'low' });
+    assert.deepEqual(reasoningOptions('xhigh'), { reasoningEffort: 'high' });
+    assert.deepEqual(reasoningOptions('off'), {});
+    assert.deepEqual(reasoningOptions(undefined), {});
+});
+
+test('continuous: two commands from one sender are both delivered, in order', async () => {
+    const f = await fixture({ continuous: true });
+    const delivered = [];
+    f.runner.options.onEventsDelivered = ({ events }) => delivered.push(events.map(e => e.text));
+    f.runner.enqueue({ kind: 'human_command', text: 'first' }, { key: 'human_command:1', urgent: true });
+    f.runner.enqueue({ kind: 'human_command', text: 'second' }, { key: 'human_command:2', urgent: true });
+    f.fake.script = async () => {
+        await f.fake.context();
+        f.runner.paused = true;
+    };
+    f.runner.start();
+    await f.clock.advance();
+    assert.deepEqual(delivered, [['first', 'second']]);
+    assert.match(f.prompts[0], /first.*second/s);
+    await f.runner.close();
+});
+
+test('continuous: an operator command interrupts a running cycle and is delivered next', async () => {
+    const f = await fixture({ continuous: true });
+    let turns = 0;
+    f.fake.script = async () => {
+        await f.fake.context();
+        turns++;
+        if (turns === 1)
+            f.runner.enqueue({ kind: 'human_command', text: 'stop that' }, { key: 'human_command:1', urgent: true });
+        else f.runner.paused = true;
+    };
+    f.runner.start();
+    await f.clock.advance();
+    assert.equal(turns, 2);
+    assert.doesNotMatch(f.prompts[0], /stop that/);
+    assert.match(f.prompts[1], /stop that/);
+    await f.runner.close();
+});
+
+test('cancel (death/respawn) keeps operator commands but drops other stale events', async () => {
+    const f = await fixture({ continuous: true });
+    f.runner.enqueue({ kind: 'human_command', text: 'build a door' }, { key: 'human_command:1', urgent: true });
+    f.runner.enqueue({ kind: 'hit' }, { key: 'hit', urgent: true });
+    f.runner.enqueue({ kind: 'direct', text: 'old dm' }, { key: 'direct:Worker02' });
+    await f.runner.cancel();
+    assert.deepEqual([...f.runner.queue.keys()], ['human_command:1']);
+    f.fake.script = async () => {
+        await f.fake.context();
+        f.runner.paused = true;
+    };
+    f.runner.paused = false;
+    f.runner.start();
+    await f.clock.advance();
+    assert.match(f.prompts[0], /build a door/);
+    assert.doesNotMatch(f.prompts[0], /old dm/);
+    await f.runner.close();
+});
+
+test('a full queue evicts ordinary events before operator commands', async () => {
+    const f = await fixture({ continuous: true, maxQueue: 2 });
+    f.runner.enqueue({ text: 'order' }, { key: 'human_command:1' });
+    f.runner.enqueue({ text: 'noise-a' }, { key: 'a' });
+    f.runner.enqueue({ text: 'noise-b' }, { key: 'b' });
+    assert.deepEqual([...f.runner.queue.keys()], ['human_command:1', 'b']);
+    await f.runner.close();
+});
+
+test('an urgent DM wakes an idle continuous agent that is waiting', async () => {
+    const f = await fixture({ continuous: true });
+    let turns = 0;
+    f.fake.script = async () => {
+        await f.fake.context();
+        turns++;
+        if (turns === 1) f.runner.requestWait(f.clock.now() + 60000);
+        else f.runner.paused = true;
+    };
+    f.runner.start();
+    await f.clock.advance();
+    assert.equal(turns, 1);
+    f.runner.enqueue({ kind: 'direct', text: 'psst' }, { key: 'direct:Worker02', urgent: true });
+    await f.clock.advance(1);
+    assert.equal(turns, 2, 'DM woke the waiting agent without waiting 60 s');
+    await f.runner.close();
 });

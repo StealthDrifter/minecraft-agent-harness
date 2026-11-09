@@ -49,3 +49,21 @@ test('difficulty is read from the packet whether it arrives as a name or an inde
     assert.equal(currentDifficulty(bot), 'hard');
     assert.equal(currentDifficulty({ game: { difficulty: 'normal' } }), 'normal');
 });
+
+test('team prompt covers current orders, DM replies, waiting and non-busywork idling', () => {
+    const prompt = buildSystemPrompt({
+        name: 'Worker01',
+        objective: 'Follow the operator.',
+        gameMode: 'survival',
+        team: true,
+        publicStatusUpdates: true,
+    });
+    assert.match(prompt, /operatorOrders/);
+    assert.match(prompt, /expects a short send_dm reply/);
+    assert.match(prompt, /call wait/);
+    assert.match(
+        prompt,
+        /greetings, questions and requests for a response with one short post_chat whether the recipient is all or your name/,
+    );
+    assert.doesNotMatch(prompt, /may also ignore/);
+});

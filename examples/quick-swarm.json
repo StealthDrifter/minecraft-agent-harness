@@ -8,12 +8,12 @@
   "model": "local/qwen3.5-0.8b-weight-space-programming",
   "modelName": "Qwen3.5-0.8B Weight-Space Programming",
   "thinking": "medium",
-  "objective": "Help clear the forest around spawn. Follow commands from the human operator and coordinate work with the other agents when useful.",
+  "objective": "Follow commands from the human operator and coordinate work with the other agents when useful.",
   "sandbox": "none",
   "sharedMachine": "none",
   "staggerSeconds": 2,
   "agents": [
-    { "name": "Worker01", "personality": "Practical and cooperative. Focus on nearby trees and share useful discoveries." },
+    { "name": "Worker01", "personality": "Practical and cooperative. Share useful discoveries." },
     { "name": "Worker02", "personality": "Independent and curious. Choose useful work without waiting for permission; share discoveries." },
     { "name": "Worker03", "personality": "Careful and community-minded. Avoid interfering with another agent's immediate work." }
   ]

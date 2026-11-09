@@ -25,6 +25,7 @@ import {
 } from './tools/game-tools.js';
 import { createWorkspaceTools } from './tools/workspace-tools.js';
 import { createDirectoryTools } from './tools/directory-tools.js';
+import { createWaitTool } from './tools/wait-tool.js';
 import { createShellTools } from './tools/shell-tools.js';
 import { loadToolsModule } from './tools/extra-tools.js';
 import { createSharedExecTool } from './tools/shared-exec.js';
@@ -172,7 +173,17 @@ export async function startAgent(settings, options = {}) {
         }
         runner?.enqueue({ source, kind, text: bounded }, { key: `${kind}:${source}`, urgent: kind === 'direct' });
     };
-    let seenDmId = 0;
+    let seenDmId = 0,
+        commandSeq = 0;
+    // Recent operator orders stay in every observation so a command is not lost to history drift,
+    // death or respawn. A newer order replaces conflicting older ones; the model judges conflicts.
+    const operatorOrders = [];
+    const ORDER_TTL_MS = 3600000;
+    const orderLines = () => {
+        const now = Date.now();
+        while (operatorOrders.length && now - operatorOrders[0].at > ORDER_TTL_MS) operatorOrders.shift();
+        return operatorOrders.map(o => ({ from: o.from, order: o.text, secondsAgo: Math.round((now - o.at) / 1000) }));
+    };
     const pendingMessages = [];
     const lastInterruptBy = new Map();
     const notifyMessage = (from, text) => {
@@ -189,7 +200,7 @@ export async function startAgent(settings, options = {}) {
     const messageAlert = () => {
         if (!pendingMessages.length) return null;
         const lines = pendingMessages.splice(0).map(m => `${m.from}: "${m.text}"`);
-        return `NEW PRIVATE MESSAGE${lines.length > 1 ? 'S' : ''} (also in read_dms): ${lines.join(' | ')}. Reply with send_dm if useful; you may also ignore it and continue your work.`;
+        return `NEW PRIVATE MESSAGE${lines.length > 1 ? 'S' : ''} (also in read_dms): ${lines.join(' | ')}. Answer it with send_dm (a short reply is enough), then continue your work.`;
     };
     process.once('SIGINT', () => void finish('operator_stop'));
     process.once('SIGTERM', () => void finish('operator_stop'));
@@ -319,10 +330,19 @@ export async function startAgent(settings, options = {}) {
                 const command = match[2].trim();
                 if (!command || (recipient.toLowerCase() !== 'all' && recipient.toLowerCase() !== name.toLowerCase()))
                     return;
-                record('human_command', { from, recipient, text: command });
+                const sequence = ++commandSeq;
+                record('human_command', { from, recipient, text: command, sequence });
+                operatorOrders.push({ from, text: command.slice(0, 300), at: Date.now() });
+                if (operatorOrders.length > 3) operatorOrders.shift();
                 runner?.enqueue(
-                    { source: from, kind: 'human_command', text: command, recipient: recipient.toLowerCase() === 'all' ? 'all' : name },
-                    { key: `human_command:${from}`, urgent: true },
+                    {
+                        source: from,
+                        kind: 'human_command',
+                        text: command,
+                        recipient: recipient.toLowerCase() === 'all' ? 'all' : name,
+                        sequence,
+                    },
+                    { key: `human_command:${sequence}`, urgent: true },
                 );
             });
             timers.push(
@@ -473,7 +493,12 @@ export async function startAgent(settings, options = {}) {
         const observe = async options => {
             const current = await observeWorld(options);
             const alert = hitAlert();
-            const state = { ...(alert ? { alert } : {}), ...current.state };
+            const orders = team ? orderLines() : [];
+            const state = {
+                ...(alert ? { alert } : {}),
+                ...(orders.length ? { operatorOrders: orders } : {}),
+                ...current.state,
+            };
             if (team) {
                 delete state.recentPublicChat;
                 if (typeof state.messaging === 'string') state.messaging = state.messaging.split(';')[0] + '.';
@@ -490,9 +515,10 @@ export async function startAgent(settings, options = {}) {
                 return { appended: true };
             },
         };
-        const extraTools = !team && options.toolsModule
-            ? await loadToolsModule(options.toolsModule, { bot, name, team, options: options.toolOptions ?? {} })
-            : [];
+        const extraTools =
+            !team && options.toolsModule
+                ? await loadToolsModule(options.toolsModule, { bot, name, team, options: options.toolOptions ?? {} })
+                : [];
         const gameTools = createGameTools({
             extraTools,
             bot,
@@ -550,6 +576,7 @@ export async function startAgent(settings, options = {}) {
                 }
         const tools = [...gameTools, ...workspaceTools];
         if (team) {
+            tools.push(createWaitTool({ requestWait: until => runner.requestWait(until) }));
             tools.push(...createDirectoryTools({ bot, peers, self: name }));
             tools.push(
                 ...createSharedNotesTools({
@@ -667,7 +694,7 @@ export async function startAgent(settings, options = {}) {
                     step,
                     events,
                     text: JSON.stringify(current.state),
-                    image: withImages ? current.frame?.metadata ?? true : false,
+                    image: withImages ? (current.frame?.metadata ?? true) : false,
                 });
                 return {
                     text: JSON.stringify({ ...current.state }),
@@ -684,6 +711,15 @@ export async function startAgent(settings, options = {}) {
             onText: text => options.onActivity?.(`"${text.replace(/\s+/g, ' ').slice(0, 300)}"`),
             onModelError: message => options.onActivity?.(`model error, will retry: ${message.slice(0, 300)}`),
             onFatal: message => void finish('model_error', { message: `Model request failed: ${message}` }),
+            onEventsDelivered: ({ events }) =>
+                record('events_delivered', {
+                    events: events.map(e => ({
+                        kind: e.kind,
+                        source: e.source ?? null,
+                        sequence: e.sequence ?? null,
+                        text: e.text ?? null,
+                    })),
+                }),
             cycleTelemetry: event => record('cycle', event),
             diagnostics: event =>
                 appendFileSync(path.join(root, 'diagnostics.jsonl'), JSON.stringify({ agent: name, ...event }) + '\n', {
